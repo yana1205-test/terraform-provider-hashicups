@@ -547,3 +547,95 @@ terraform import hashicups_order.edu 2
 terraform show
 
 cd ../..
+
+# 9. Implement a function
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-functions
+
+# Implement the function
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-functions#implement-the-function
+cat << EOL > internal/provider/compute_tax_function.go
+package provider
+
+import (
+    "math"
+    "context"
+    "github.com/hashicorp/terraform-plugin-framework/function"
+)
+
+// Ensure the implementation satisfies the desired interfaces.
+var _ function.Function = &ComputeTaxFunction{}
+
+type ComputeTaxFunction struct{}
+
+func NewComputeTaxFunction() function.Function {
+    return &ComputeTaxFunction{}
+}
+
+func (f *ComputeTaxFunction) Metadata(ctx context.Context, req function.MetadataRequest, resp *function.MetadataResponse) {
+    resp.Name = "compute_tax"
+}
+
+func (f *ComputeTaxFunction) Definition(ctx context.Context, req function.DefinitionRequest, resp *function.DefinitionResponse) {
+    resp.Definition = function.Definition{
+        Summary:     "Compute tax for coffee",
+        Description: "Given a price and tax rate, return the total cost including tax.",
+    Parameters: []function.Parameter{
+            function.Float64Parameter{
+                Name:        "price",
+                Description: "Price of coffee item.",
+            },
+            function.Float64Parameter{
+                Name:        "rate",
+                Description: "Tax rate. 0.085 == 8.5%",
+            },
+        },
+        Return: function.Float64Return{},
+    }
+}
+
+func (f *ComputeTaxFunction) Run(ctx context.Context, req function.RunRequest, resp *function.RunResponse) {
+    var price float64
+    var rate float64
+    var total float64
+
+    // Read Terraform argument data into the variables
+    resp.Error = function.ConcatFuncErrors(resp.Error, req.Arguments.Get(ctx, &price, &rate))
+
+    total = math.Round((price + price * rate) * 100) / 100;
+
+    // Set the result
+    resp.Error = function.ConcatFuncErrors(resp.Error, resp.Result.Set(ctx, total));
+}
+EOL
+
+go install .
+
+# Verify the function
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-functions#verify-the-function
+mkdir examples/compute_tax && cd "$_"
+cat << EOL > main.tf
+terraform {
+  required_providers {
+    hashicups = {
+      source  = "hashicorp.com/edu/hashicups"
+    }
+  }
+  required_version = ">= 1.8.0"
+}
+
+provider "hashicups" {
+  username = "education"
+  password = "test123"
+  host     = "http://localhost:19090"
+}
+
+output "total_price" {
+  value = provider::hashicups::compute_tax(5.00, 0.085)
+}
+EOL
+
+# You call provider-defined functions with the syntax provider::<PROVIDER_NAME>::<FUNCTION_NAME>(<ARGUMENTS>).
+# Apply this configuration to ensure that the compute_tax function returns the total price after tax is applied.
+terraform apply -auto-approve
+
+cd ../..
