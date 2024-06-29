@@ -548,7 +548,7 @@ terraform show
 
 cd ../..
 
-# 9. Implement a function
+# 10. Implement a function
 # https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-functions
 
 # Implement the function
@@ -637,5 +637,173 @@ EOL
 # You call provider-defined functions with the syntax provider::<PROVIDER_NAME>::<FUNCTION_NAME>(<ARGUMENTS>).
 # Apply this configuration to ensure that the compute_tax function returns the total price after tax is applied.
 terraform apply -auto-approve
+
+cd ../..
+
+# 11. Implement automated testing
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-acceptance-testing
+
+# Implement data source id attribute
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-acceptance-testing#implement-data-source-id-attribute
+
+# Implement data source acceptance testing
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-acceptance-testing#implement-data-source-acceptance-testing
+
+# Verify data source testing functionality
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-acceptance-testing#verify-data-source-testing-functionality
+TF_ACC=1 go test -count=1 -v
+
+# Implement resource testing functionality
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-acceptance-testing#implement-resource-testing-functionality
+cat << 'EOL' > order_resource_test.go
+package provider
+
+import (
+  "testing"
+
+  "github.com/hashicorp/terraform-plugin-testing/helper/resource"
+)
+
+func TestAccOrderResource(t *testing.T) {
+  resource.Test(t, resource.TestCase{
+    ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+    Steps: []resource.TestStep{
+      // Create and Read testing
+      {
+        Config: providerConfig + `
+resource "hashicups_order" "test" {
+  items = [
+    {
+      coffee = {
+        id = 1
+      }
+      quantity = 2
+    },
+  ]
+}
+`,
+        Check: resource.ComposeAggregateTestCheckFunc(
+          // Verify number of items
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.#", "1"),
+          // Verify first order item
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.quantity", "2"),
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.id", "1"),
+          // Verify first coffee item has Computed attributes filled.
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.description", ""),
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.image", "/hashicorp.png"),
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.name", "HCP Aeropress"),
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.price", "200"),
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.teaser", "Automation in a cup"),
+          // Verify dynamic values have any value set in the state.
+          resource.TestCheckResourceAttrSet("hashicups_order.test", "id"),
+          resource.TestCheckResourceAttrSet("hashicups_order.test", "last_updated"),
+        ),
+      },
+      // ImportState testing
+      {
+        ResourceName:      "hashicups_order.test",
+        ImportState:       true,
+        ImportStateVerify: true,
+        // The last_updated attribute does not exist in the HashiCups
+        // API, therefore there is no value for it during import.
+        ImportStateVerifyIgnore: []string{"last_updated"},
+      },
+      // Update and Read testing
+      {
+        Config: providerConfig + `
+resource "hashicups_order" "test" {
+  items = [
+    {
+      coffee = {
+        id = 2
+      }
+      quantity = 2
+    },
+  ]
+}
+`,
+        Check: resource.ComposeAggregateTestCheckFunc(
+          // Verify first order item updated
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.quantity", "2"),
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.id", "2"),
+          // Verify first coffee item has Computed attributes updated.
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.description", ""),
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.image", "/packer.png"),
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.name", "Packer Spiced Latte"),
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.price", "350"),
+          resource.TestCheckResourceAttr("hashicups_order.test", "items.0.coffee.teaser", "Packed with goodness to spice up your images"),
+        ),
+      },
+      // Delete testing automatically occurs in TestCase
+    },
+  })
+}
+EOL
+
+# Verify resource testing functionality
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-acceptance-testing#verify-resource-testing-functionality
+TF_ACC=1 go test -count=1 -run='TestAccOrderResource' -v
+
+# Implement function testing functionality
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-acceptance-testing#implement-function-testing-functionality
+cat << 'EOL' > compute_tax_function_test.go
+// Copyright (c) HashiCorp, Inc.
+// SPDX-License-Identifier: MPL-2.0
+
+package provider
+
+import (
+  "regexp"
+  "testing"
+
+  "github.com/hashicorp/terraform-plugin-testing/helper/resource"
+  "github.com/hashicorp/terraform-plugin-testing/tfversion"
+)
+
+func TestComputeTaxFunction_Known(t *testing.T) {
+  resource.UnitTest(t, resource.TestCase{
+    TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+      tfversion.SkipBelow(tfversion.Version1_8_0),
+    },
+    ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+    Steps: []resource.TestStep{
+      {
+        Config: `
+        output "test" {
+          value = provider::hashicups::compute_tax(5.00, 0.085)
+        }
+        `,
+        Check: resource.ComposeAggregateTestCheckFunc(
+          resource.TestCheckOutput("test", "5.43"),
+        ),
+      },
+    },
+  })
+}
+
+func TestComputeTaxFunction_Null(t *testing.T) {
+  resource.UnitTest(t, resource.TestCase{
+    TerraformVersionChecks: []tfversion.TerraformVersionCheck{
+      tfversion.SkipBelow(tfversion.Version1_8_0),
+    },
+    ProtoV6ProviderFactories: testAccProtoV6ProviderFactories,
+    Steps: []resource.TestStep{
+      {
+        Config: `
+        output "test" {
+          value = provider::hashicups::compute_tax(null, 0.085)
+        }
+        `,
+        // The parameter does not enable AllowNullValue
+        ExpectError: regexp.MustCompile(`argument must not be null`),
+      },
+    },
+  })
+}
+EOL
+
+# Verify function testing functionality
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-acceptance-testing#verify-function-testing-functionality
+TF_ACC=1 go test -count=1 -run='TestComputeTaxFunction' -v
 
 cd ../..
