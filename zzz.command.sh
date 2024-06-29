@@ -880,3 +880,11 @@ git add .
 git commit -m 'Add docs, goreleaser, and GH actions'
 git tag v0.2.1
 git push origin v0.2.1
+
+# 14. Cleanup
+cd docker_compose
+docker compose down
+cd ..
+
+go clean -i terraform-provider-hashicups
+rm ~/.terraformrc
