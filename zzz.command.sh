@@ -807,3 +807,39 @@ EOL
 TF_ACC=1 go test -count=1 -run='TestComputeTaxFunction' -v
 
 cd ../..
+
+# 12. Implement documentation generation
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-documentation-generation
+
+# Add schema descriptions
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-documentation-generation#add-schema-descriptions
+
+# Review function documentation
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-documentation-generation#review-function-documentation
+
+# Add configuration examples
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-documentation-generation#add-configuration-examples
+
+# Add resource import documentation
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-documentation-generation#add-resource-import-documentation
+cat << EOL > examples/resources/hashicups_order/import.sh
+# Order can be imported by specifying the numeric identifier.
+terraform import hashicups_order.example 123
+EOL
+
+# Add function example
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-documentation-generation#add-function-example
+mkdir -p examples/functions/compute_tax
+cat << EOL > examples/functions/compute_tax/function.tf
+# Compute total price with tax
+output "total_price" {
+  value = provider::hashicups::compute_tax(5.00, 0.085)
+}
+EOL
+
+# Run documentation generation
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-documentation-generation#run-documentation-generation
+
+# Now that you have implemented the documentation generation functionality for your provider, run the go generate ./... command to generate the documentation.
+go generate ./...
+# View the generated files in the docs directory to verify that the documentation contains the expected descriptions, examples, and schema information.
