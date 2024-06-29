@@ -843,3 +843,40 @@ EOL
 # Now that you have implemented the documentation generation functionality for your provider, run the go generate ./... command to generate the documentation.
 go generate ./...
 # View the generated files in the docs directory to verify that the documentation contains the expected descriptions, examples, and schema information.
+
+# 13. Release and publish to the Terraform registry
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-release-publish
+
+git remote rm origin
+git remote add origin git@github.com:yana1205-test/terraform-provider-hashicups.git
+git branch -M main
+git push -u origin main
+
+# Verify Terraform Registry Manifest file
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-release-publish#verify-terraform-registry-manifest-file
+
+# Verify GoReleaser configuration
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-release-publish#verify-goreleaser-configuration
+
+# Verify GitHub Action workflow
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-release-publish#verify-github-action-workflow
+
+# Generate GPG Signing Key
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-release-publish#generate-gpg-signing-key
+gpg --full-generate-key
+
+# Generate GPG public key
+gpg --armor --export "Terraform Education <team-terraform-education@hashicorp.com>"
+
+# Generate GPG private key
+gpg --armor --export-secret-keys "Terraform Education <team-terraform-education@hashicorp.com>"
+
+# Add GitHub secrets for GitHub Action
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-release-publish#add-github-secrets-for-github-action
+
+# Create a provider release
+# https://developer.hashicorp.com/terraform/tutorials/providers-plugin-framework/providers-plugin-framework-release-publish#create-a-provider-release
+git add .
+git commit -m 'Add docs, goreleaser, and GH actions'
+git tag v0.2.1
+git push origin v0.2.1
